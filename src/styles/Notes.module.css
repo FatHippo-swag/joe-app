@@ -36,12 +36,15 @@
   border-bottom: 2px solid #111c2e; /* Create a visual separation */
   height: 40px; /* Fixed height for tab container */
   min-height: 40px; /* Ensure minimum height */
-  margin-bottom: 40px; /* Add margin to accommodate for expanded tabs */
+  margin-bottom: 60px; /* Increase margin to accommodate for expanded tabs */
+  overflow: visible; /* Allow tabs to visually overflow */
 }
 
 .tabs {
   display: flex;
   position: relative;
+  min-height: 40px;
+  overflow: visible; /* Important for allowing tabs to expand beyond container */
 }
 
 .tab {
@@ -59,9 +62,17 @@
   justify-content: center;
   height: 40px;
   will-change: transform, height;
-  transition: opacity 0.2s ease;
-  /* Use absolute positioning to prevent affecting layout when dragged */
-  position: relative;
+  transition: opacity 0.2s ease, background-color 0.2s ease, transform 0.15s ease-out, height 0.15s ease-out;
+  /* Add hardware acceleration for smoother animations */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Add a class for snapping animations when releasing a tab */
+.tabSnapping {
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              height 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
 }
 
 .tab:hover {
@@ -110,12 +121,14 @@
   visibility: hidden;
   opacity: 0;
   transition: opacity 0.2s ease, visibility 0.2s ease;
+  pointer-events: none; /* Initially disable interaction */
 }
 
 .tabPartiallyExtended .tabOptions,
 .tabFullyExtended .tabOptions {
   visibility: visible;
   opacity: 1;
+  pointer-events: auto; /* Re-enable interaction when visible */
 }
 
 .tabOptionButton {
@@ -126,8 +139,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 30px; /* Increased clickable area */
+  height: 30px; /* Increased clickable area */
+  padding: 0;
+  transition: transform 0.1s ease-out;
 }
 
 .tabOptionButton:hover {
@@ -141,24 +156,28 @@
   right: 0;
   display: flex;
   justify-content: center;
-  gap: 5px;
+  gap: 8px; /* Spacing between color options */
+  padding: 0 10px; /* Add padding to prevent touching edges */
   visibility: hidden;
   opacity: 0;
   transition: opacity 0.2s ease, visibility 0.2s ease;
+  pointer-events: none; /* Initially disable interaction */
 }
 
 .tabPartiallyExtended .colorPicker,
 .tabFullyExtended .colorPicker {
   visibility: visible;
   opacity: 1;
+  pointer-events: auto; /* Re-enable interaction when visible */
 }
 
 .colorOption {
-  width: 15px;
-  height: 15px;
+  width: 16px; /* Slightly smaller size */
+  height: 16px; /* Slightly smaller size */
   border-radius: 50%;
   cursor: pointer;
-  border: 1px solid transparent;
+  border: 2px solid transparent;
+  transition: transform 0.1s ease-out, border-color 0.1s ease;
 }
 
 .colorOption.selected {
@@ -198,7 +217,6 @@
   position: relative;
   z-index: 0;
   margin-top: 0;
-  /* Important: Fix the position of the noteContent so tabs don't affect it */
   position: relative;
   overflow: auto;
 }
@@ -229,6 +247,16 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modalContent {
@@ -237,6 +265,19 @@
   border-radius: 0.5rem;
   width: 100%;
   max-width: 400px;
+  animation: slideIn 0.2s ease-out;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .modalTitle {
@@ -269,6 +310,7 @@
   border-radius: 0.25rem;
   cursor: pointer;
   font-family: 'More Sugar', sans-serif;
+  transition: background-color 0.2s ease;
 }
 
 .cancelButton {
@@ -276,21 +318,26 @@
   color: white;
 }
 
+.cancelButton:hover {
+  background-color: #2c4a6f;
+}
+
 .saveButton {
   background-color: #5f8bbf;
   color: white;
 }
 
+.saveButton:hover {
+  background-color: #4a7ab0;
+}
+
 /* Tab that's being dragged should appear above everything */
 .draggingTab {
   z-index: 1000 !important; /* Much higher z-index to go over header */
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
-/* Ensure that tabs being reordered stay level (no vertical shift) */
-.tabs {
-  position: relative;
-  display: flex;
-  /* Ensure tabs container has enough height to accommodate expanded tabs */
-  min-height: 40px;
-  overflow: visible;
+/* Feedback for drag interactions */
+.tab:active {
+  cursor: grabbing;
 }
