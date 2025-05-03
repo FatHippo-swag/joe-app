@@ -33,6 +33,7 @@
     padding: 1rem 2rem 0;
     position: relative;
     z-index: 2;
+    border-bottom: 2px solid #111c2e; /* Create a visual separation */
   }
   
   .tabs {
@@ -192,6 +193,8 @@
     position: relative;
     z-index: 0;
     margin-top: 0;
+    /* Important: This will prevent content from moving when tabs are dragged */
+    overflow: auto;
   }
   
   .noteTextarea {
@@ -275,4 +278,13 @@
   /* Tab that's being dragged should appear above everything */
   .draggingTab {
     z-index: 1000 !important; /* Much higher z-index to go over header */
+  }
+  
+  /* Ensure that tabs being reordered stay level (no vertical shift) */
+  .tabs {
+    position: relative;
+    display: flex;
+    /* Ensure tabs container has enough height to accommodate expanded tabs */
+    min-height: 40px;
+    overflow: visible;
   }

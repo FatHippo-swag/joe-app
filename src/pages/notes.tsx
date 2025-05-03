@@ -13,13 +13,17 @@ export default function Notes() {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameNoteId, setRenameNoteId] = useState<string | null>(null);
   const [newNoteName, setNewNoteName] = useState('');
+  const [dragType, setDragType] = useState<'vertical' | 'horizontal' | null>(null);
   
   // Refs for drag handling
   const dragStartY = useRef(0);
   const dragCurrentY = useRef(0);
+  const dragStartX = useRef(0);
+  const dragCurrentX = useRef(0);
   const isDragging = useRef(false);
   const tabRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const lastDragPosition = useRef<{ [key: string]: number }>({});
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
   const MAX_DRAG_DISTANCE = 100;
   
   // Create a new note with current date as default name
@@ -131,6 +135,7 @@ export default function Notes() {
     if (tabElement) {
       tabElement.style.transform = 'translateY(0)';
       tabElement.style.height = '40px';
+      tabElement.style.zIndex = '';
       tabElement.classList.remove(styles.tabPartiallyExtended);
       tabElement.classList.remove(styles.tabFullyExtended);
       tabElement.classList.remove(styles.draggingTab);
@@ -141,6 +146,7 @@ export default function Notes() {
     
     if (id === draggedTabId) {
       setDraggedTabId(null);
+      setDragType(null);
     }
   };
   
@@ -168,6 +174,40 @@ export default function Notes() {
     }
   };
   
+  // Calculate tab positions for horizontal reordering
+  const getTabPositions = () => {
+    const positions: { id: string, left: number, width: number, index: number }[] = [];
+    
+    notes.forEach((note, index) => {
+      const tabElement = tabRefs.current[note.id];
+      if (tabElement) {
+        const rect = tabElement.getBoundingClientRect();
+        positions.push({
+          id: note.id,
+          left: rect.left,
+          width: rect.width,
+          index
+        });
+      }
+    });
+    
+    return positions;
+  };
+  
+  // Reorder tabs
+  const reorderTabs = (fromId: string, toIndex: number) => {
+    setNotes(prevNotes => {
+      const fromIndex = prevNotes.findIndex(note => note.id === fromId);
+      if (fromIndex === -1) return prevNotes;
+      
+      const reorderedNotes = [...prevNotes];
+      const [movedNote] = reorderedNotes.splice(fromIndex, 1);
+      reorderedNotes.splice(toIndex, 0, movedNote);
+      
+      return reorderedNotes;
+    });
+  };
+  
   // Handle tab drag start
   const handleDragStart = (e: React.MouseEvent, id: string) => {
     // Skip if we're clicking on an interactive element inside the tab
@@ -179,6 +219,8 @@ export default function Notes() {
     e.preventDefault();
     dragStartY.current = e.clientY;
     dragCurrentY.current = e.clientY;
+    dragStartX.current = e.clientX;
+    dragCurrentX.current = e.clientX;
     isDragging.current = true;
     
     // If we're clicking on a different tab than the dragged one, reset the current dragged tab
@@ -189,11 +231,13 @@ export default function Notes() {
     // Set clicked tab as active and dragged tab
     setActiveNoteId(id);
     setDraggedTabId(id);
+    setDragType(null); // Initially not determined
     
     // Add dragging class to the tab
     const tabElement = tabRefs.current[id];
     if (tabElement) {
       tabElement.classList.add(styles.draggingTab);
+      tabElement.style.zIndex = '1000';
     }
     
     document.addEventListener('mousemove', handleDragMove);
@@ -205,34 +249,81 @@ export default function Notes() {
     if (!isDragging.current || !draggedTabId) return;
     
     dragCurrentY.current = e.clientY;
-    // Get the relative drag from the start point
-    const deltaY = dragStartY.current - dragCurrentY.current;
+    dragCurrentX.current = e.clientX;
     
-    // Get the tab element
+    // Determine drag type if not already set
+    if (!dragType) {
+      const deltaX = Math.abs(dragStartX.current - dragCurrentX.current);
+      const deltaY = Math.abs(dragStartY.current - dragCurrentY.current);
+      
+      // If movement is significant enough to determine direction
+      if (deltaX > 5 || deltaY > 5) {
+        setDragType(deltaX > deltaY ? 'horizontal' : 'vertical');
+      } else {
+        return; // Not enough movement to determine direction
+      }
+    }
+    
     const tabElement = tabRefs.current[draggedTabId];
     if (!tabElement) return;
     
-    // Get the last drag position or use 0 if none exists
-    const lastPosition = lastDragPosition.current[draggedTabId] || 0;
+    if (dragType === 'vertical') {
+      // Vertical dragging for tab options
+      const deltaY = dragStartY.current - dragCurrentY.current;
+      
+      // Get the last drag position or use 0 if none exists
+      const lastPosition = lastDragPosition.current[draggedTabId] || 0;
+      
+      // Calculate new drag distance, adding to the last position
+      let dragDistance = lastPosition + deltaY;
+      
+      // Constrain drag distance to be between 0 and MAX_DRAG_DISTANCE
+      dragDistance = Math.min(Math.max(0, dragDistance), MAX_DRAG_DISTANCE);
+      
+      // Update the tab position and height
+      tabElement.style.transform = `translateY(-${dragDistance}px)`;
+      tabElement.style.height = `${40 + dragDistance}px`;
+      
+      // Update extension state
+      updateTabExtensionState(draggedTabId, dragDistance);
+      
+      // Store the new position
+      lastDragPosition.current[draggedTabId] = dragDistance;
+    } else if (dragType === 'horizontal') {
+      // Horizontal dragging for tab reordering
+      const tabPositions = getTabPositions();
+      const currentIndex = tabPositions.findIndex(pos => pos.id === draggedTabId);
+      if (currentIndex === -1) return;
+      
+      // Calculate the current position of the dragged tab
+      const offsetX = dragCurrentX.current - dragStartX.current;
+      const currentPosition = tabPositions[currentIndex].left + offsetX;
+      
+      // Move the tab visually
+      tabElement.style.transform = `translateX(${offsetX}px)`;
+      
+      // Check if we should reorder
+      for (let i = 0; i < tabPositions.length; i++) {
+        if (i !== currentIndex) {
+          const pos = tabPositions[i];
+          const centerPoint = pos.left + (pos.width / 2);
+          
+          if ((i < currentIndex && currentPosition < centerPoint) ||
+              (i > currentIndex && currentPosition > centerPoint)) {
+            // Reorder the tabs
+            reorderTabs(draggedTabId, i);
+            // Reset drag start position to avoid jumps
+            dragStartX.current = dragCurrentX.current;
+            return;
+          }
+        }
+      }
+    }
     
-    // Calculate new drag distance, adding to the last position
-    let dragDistance = lastPosition + deltaY;
-    
-    // Constrain drag distance to be between 0 and MAX_DRAG_DISTANCE
-    dragDistance = Math.min(Math.max(0, dragDistance), MAX_DRAG_DISTANCE);
-    
-    // Update the tab position and height
-    tabElement.style.transform = `translateY(-${dragDistance}px)`;
-    tabElement.style.height = `${40 + dragDistance}px`;
-    
-    // Update extension state
-    updateTabExtensionState(draggedTabId, dragDistance);
-    
-    // Reset the drag start point to the current point
-    dragStartY.current = dragCurrentY.current;
-    
-    // Store the new position
-    lastDragPosition.current[draggedTabId] = dragDistance;
+    // Reset the drag start point to the current point for vertical dragging
+    if (dragType === 'vertical') {
+      dragStartY.current = dragCurrentY.current;
+    }
   };
   
   // Handle tab drag end
@@ -240,6 +331,17 @@ export default function Notes() {
     if (!draggedTabId) return;
     
     isDragging.current = false;
+    
+    // If horizontal dragging, reset the transform
+    if (dragType === 'horizontal') {
+      const tabElement = tabRefs.current[draggedTabId];
+      if (tabElement) {
+        tabElement.style.transform = 'translateY(0)';
+        tabElement.style.zIndex = '';
+      }
+      setDraggedTabId(null);
+      setDragType(null);
+    }
     
     document.removeEventListener('mousemove', handleDragMove);
     document.removeEventListener('mouseup', handleDragEnd);
@@ -280,11 +382,16 @@ export default function Notes() {
     if (savedNotes) {
       try {
         const parsedNotes = JSON.parse(savedNotes);
-        setNotes(parsedNotes);
+        // Convert string dates back to Date objects
+        const processedNotes = parsedNotes.map((note: any) => ({
+          ...note,
+          createdAt: new Date(note.createdAt)
+        }));
+        setNotes(processedNotes);
         
         // Set the most recent note as active if available
-        if (parsedNotes.length > 0) {
-          const mostRecentNote = [...parsedNotes].sort((a, b) => 
+        if (processedNotes.length > 0) {
+          const mostRecentNote = [...processedNotes].sort((a, b) => 
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           )[0];
           setActiveNoteId(mostRecentNote.id);
@@ -344,7 +451,7 @@ export default function Notes() {
         <h1 className={styles.title}>Notes</h1>
       </header>
       
-      <div className={styles.tabsContainer}>
+      <div className={styles.tabsContainer} ref={tabsContainerRef}>
         <div className={styles.tabs}>
           {notes.map(note => (
             <div 
