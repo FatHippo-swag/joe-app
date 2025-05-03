@@ -1,3 +1,6 @@
+// Enhanced version of the Notes component with improved tab drag functionality
+// src/pages/notes.tsx
+
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -17,13 +20,12 @@ export default function Notes() {
   
   // Refs for drag handling
   const dragStartY = useRef(0);
-  const dragCurrentY = useRef(0);
   const dragStartX = useRef(0);
-  const dragCurrentX = useRef(0);
   const isDragging = useRef(false);
+  const hasDragMoved = useRef(false); // New flag to track if drag has actually moved
   const tabRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  const lastDragPosition = useRef<{ [key: string]: number }>({});
   const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const dragOffsetY = useRef<{ [key: string]: number }>({});
   const MAX_DRAG_DISTANCE = 100;
   
   // Create a new note with current date as default name
@@ -85,9 +87,9 @@ export default function Notes() {
   const deleteNote = (id: string) => {
     setNotes(prevNotes => prevNotes.filter(note => note.id !== id));
     
-    // Delete the last drag position for this tab
-    if (lastDragPosition.current[id]) {
-      delete lastDragPosition.current[id];
+    // Delete the drag offset for this tab
+    if (dragOffsetY.current[id]) {
+      delete dragOffsetY.current[id];
     }
     
     if (id === draggedTabId) {
@@ -140,8 +142,8 @@ export default function Notes() {
       tabElement.classList.remove(styles.tabFullyExtended);
       tabElement.classList.remove(styles.draggingTab);
       
-      // Reset the stored position
-      lastDragPosition.current[id] = 0;
+      // Reset the stored offset
+      dragOffsetY.current[id] = 0;
     }
     
     if (id === draggedTabId) {
@@ -218,26 +220,35 @@ export default function Notes() {
     
     e.preventDefault();
     dragStartY.current = e.clientY;
-    dragCurrentY.current = e.clientY;
     dragStartX.current = e.clientX;
-    dragCurrentX.current = e.clientX;
     isDragging.current = true;
+    hasDragMoved.current = false; // Reset the movement flag
     
     // If we're clicking on a different tab than the dragged one, reset the current dragged tab
     if (draggedTabId && draggedTabId !== id) {
       resetTabPosition(draggedTabId);
     }
     
-    // Set clicked tab as active and dragged tab
+    // Set clicked tab as active immediately
     setActiveNoteId(id);
-    setDraggedTabId(id);
-    setDragType(null); // Initially not determined
     
-    // Add dragging class to the tab
-    const tabElement = tabRefs.current[id];
-    if (tabElement) {
-      tabElement.classList.add(styles.draggingTab);
-      tabElement.style.zIndex = '1000';
+    // Only set as dragged tab if it's not already being dragged
+    // This helps prevent the "needs second click" issue
+    if (draggedTabId !== id) {
+      setDraggedTabId(id);
+      setDragType(null); // Initially not determined
+      
+      // Initialize the drag offset if it doesn't exist
+      if (dragOffsetY.current[id] === undefined) {
+        dragOffsetY.current[id] = 0;
+      }
+      
+      // Add dragging class to the tab
+      const tabElement = tabRefs.current[id];
+      if (tabElement) {
+        tabElement.classList.add(styles.draggingTab);
+        tabElement.style.zIndex = '1000';
+      }
     }
     
     document.addEventListener('mousemove', handleDragMove);
@@ -248,20 +259,19 @@ export default function Notes() {
   const handleDragMove = (e: MouseEvent) => {
     if (!isDragging.current || !draggedTabId) return;
     
-    dragCurrentY.current = e.clientY;
-    dragCurrentX.current = e.clientX;
+    // Calculate deltas
+    const deltaX = e.clientX - dragStartX.current;
+    const deltaY = e.clientY - dragStartY.current;
+    
+    // If movement is significant, mark that we've moved
+    if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+      hasDragMoved.current = true;
+    }
     
     // Determine drag type if not already set
-    if (!dragType) {
-      const deltaX = Math.abs(dragStartX.current - dragCurrentX.current);
-      const deltaY = Math.abs(dragStartY.current - dragCurrentY.current);
-      
-      // If movement is significant enough to determine direction
-      if (deltaX > 5 || deltaY > 5) {
-        setDragType(deltaX > deltaY ? 'horizontal' : 'vertical');
-      } else {
-        return; // Not enough movement to determine direction
-      }
+    if (!dragType && hasDragMoved.current) {
+      setDragType(Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical');
+      return; // Wait for next frame to apply the determined drag type
     }
     
     const tabElement = tabRefs.current[draggedTabId];
@@ -269,26 +279,30 @@ export default function Notes() {
     
     if (dragType === 'vertical') {
       // Vertical dragging for tab options
-      const deltaY = dragStartY.current - dragCurrentY.current;
+      // We want to drag upward, so we use negative deltaY
+      const dragUpAmount = -deltaY;
       
-      // Get the last drag position or use 0 if none exists
-      const lastPosition = lastDragPosition.current[draggedTabId] || 0;
+      // Get the current offset
+      let currentOffset = dragOffsetY.current[draggedTabId] || 0;
       
-      // Calculate new drag distance, adding to the last position
-      let dragDistance = lastPosition + deltaY;
+      // Calculate new drag distance by adding the new delta
+      let newOffset = currentOffset + dragUpAmount;
       
       // Constrain drag distance to be between 0 and MAX_DRAG_DISTANCE
-      dragDistance = Math.min(Math.max(0, dragDistance), MAX_DRAG_DISTANCE);
+      newOffset = Math.min(Math.max(0, newOffset), MAX_DRAG_DISTANCE);
       
       // Update the tab position and height
-      tabElement.style.transform = `translateY(-${dragDistance}px)`;
-      tabElement.style.height = `${40 + dragDistance}px`;
+      tabElement.style.transform = `translateY(-${newOffset}px)`;
+      tabElement.style.height = `${40 + newOffset}px`;
       
       // Update extension state
-      updateTabExtensionState(draggedTabId, dragDistance);
+      updateTabExtensionState(draggedTabId, newOffset);
       
-      // Store the new position
-      lastDragPosition.current[draggedTabId] = dragDistance;
+      // Store the new offset
+      dragOffsetY.current[draggedTabId] = newOffset;
+      
+      // Reset the drag start point to avoid accumulation
+      dragStartY.current = e.clientY;
     } else if (dragType === 'horizontal') {
       // Horizontal dragging for tab reordering
       const tabPositions = getTabPositions();
@@ -296,7 +310,7 @@ export default function Notes() {
       if (currentIndex === -1) return;
       
       // Calculate the current position of the dragged tab
-      const offsetX = dragCurrentX.current - dragStartX.current;
+      const offsetX = e.clientX - dragStartX.current;
       const currentPosition = tabPositions[currentIndex].left + offsetX;
       
       // Move the tab visually
@@ -313,16 +327,11 @@ export default function Notes() {
             // Reorder the tabs
             reorderTabs(draggedTabId, i);
             // Reset drag start position to avoid jumps
-            dragStartX.current = dragCurrentX.current;
+            dragStartX.current = e.clientX;
             return;
           }
         }
       }
-    }
-    
-    // Reset the drag start point to the current point for vertical dragging
-    if (dragType === 'vertical') {
-      dragStartY.current = dragCurrentY.current;
     }
   };
   
@@ -332,15 +341,23 @@ export default function Notes() {
     
     isDragging.current = false;
     
-    // If horizontal dragging, reset the transform
-    if (dragType === 'horizontal') {
-      const tabElement = tabRefs.current[draggedTabId];
-      if (tabElement) {
-        tabElement.style.transform = 'translateY(0)';
-        tabElement.style.zIndex = '';
+    // If there was no significant movement, treat it as a click
+    if (!hasDragMoved.current) {
+      // If tab is already extended, collapse it
+      if (dragOffsetY.current[draggedTabId] > 0) {
+        resetTabPosition(draggedTabId);
       }
-      setDraggedTabId(null);
-      setDragType(null);
+    } else {
+      // If horizontal dragging, reset the transform
+      if (dragType === 'horizontal') {
+        const tabElement = tabRefs.current[draggedTabId];
+        if (tabElement) {
+          tabElement.style.transform = 'translateY(0)';
+          tabElement.style.zIndex = '';
+        }
+        setDraggedTabId(null);
+        setDragType(null);
+      }
     }
     
     document.removeEventListener('mousemove', handleDragMove);
@@ -404,8 +421,8 @@ export default function Notes() {
       createNewNote();
     }
     
-    // Initialize lastDragPosition ref
-    lastDragPosition.current = {};
+    // Initialize dragOffsetY ref
+    dragOffsetY.current = {};
     
     // Add document click handler to reset tabs when clicking outside
     document.addEventListener('click', handleDocumentClick);
