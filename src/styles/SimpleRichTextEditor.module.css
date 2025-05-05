@@ -1,0 +1,227 @@
+.editor {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 50vh;
+    background-color: #111c2e;
+    color: white;
+  }
+  
+  .toolbar {
+    display: flex;
+    padding: 8px;
+    background-color: #2c4a6f;
+    border-bottom: 1px solid #3a5e8c;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .toolbarButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    margin-right: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-family: 'More Sugar', sans-serif;
+    font-weight: normal;
+  }
+  
+  .toolbarButton:hover {
+    background-color: #3a5e8c;
+  }
+  
+  .toolbarButton.active {
+    background-color: #5f8bbf;
+  }
+  
+  .divider {
+    width: 1px;
+    height: 24px;
+    background-color: #3a5e8c;
+    margin: 0 8px;
+  }
+  
+  .content {
+    flex: 1;
+    padding: 16px;
+    color: white;
+    font-size: 1.2rem;
+    font-family: 'More Sugar', sans-serif;
+    font-weight: 100; /* Thin font by default */
+    outline: none;
+    overflow-y: auto;
+    min-height: 50vh;
+    line-height: 1.5;
+    white-space: pre-wrap; /* Respect spaces and line breaks */
+    word-break: break-word; /* Break long words */
+  }
+  
+  .content:empty:before {
+    content: attr(placeholder);
+    color: rgba(255, 255, 255, 0.5);
+    pointer-events: none;
+  }
+  
+  /* Add minimum height to paragraphs and divs to ensure proper navigation */
+  .content p, .content div:not(.taskItem) {
+    min-height: 1.5em;
+    margin: 0.5em 0;
+  }
+  
+  /* Ensure better cursor visibility */
+  .content *::selection {
+    background-color: rgba(95, 139, 191, 0.4);
+  }
+  
+  /* Text formatting styles */
+  .bold {
+    font-weight: normal; /* "Bold" is actually More Sugar Regular */
+    font-family: 'More Sugar', sans-serif;
+  }
+  
+  .small {
+    font-size: 0.9rem;
+  }
+  
+  .normal {
+    font-size: 1.2rem;
+  }
+  
+  .large {
+    font-size: 1.5rem;
+  }
+  
+  .extraLarge {
+    font-size: 2rem;
+  }
+  
+  /* Heading styles */
+  .heading1 {
+    font-size: 2.5rem;
+    margin: 16px 0 8px 0;
+    font-weight: normal;
+    color: #7aa3d2;
+    font-family: 'More Sugar', sans-serif;
+  }
+  
+  .heading2 {
+    font-size: 2rem;
+    margin: 14px 0 8px 0;
+    font-weight: normal;
+    color: #7aa3d2;
+    font-family: 'More Sugar', sans-serif;
+  }
+  
+  .heading3 {
+    font-size: 1.7rem;
+    margin: 12px 0 8px 0;
+    font-weight: normal;
+    color: #7aa3d2;
+    font-family: 'More Sugar', sans-serif;
+  }
+  
+  /* List styles */
+  .bulletList {
+    margin: 8px 0;
+    padding-left: 24px;
+    color: #7aa3d2;
+  }
+  
+  .bulletList li {
+    margin: 4px 0;
+  }
+  
+  .bulletList li span {
+    color: white;
+  }
+  
+  /* Task item styles */
+  .taskItem {
+    display: flex;
+    align-items: flex-start;
+    margin: 8px 0;
+    position: relative;
+    min-height: 24px;
+  }
+  
+  .checkbox {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 1.2rem;
+    color: #5f8bbf;
+    cursor: pointer;
+    user-select: none;
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  
+  .taskText {
+    flex: 1;
+    min-height: 24px;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .taskText:empty:before {
+    content: '\00a0'; /* Non-breaking space to maintain height */
+  }
+  
+  .taskCompleted {
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
+  
+  /* Dropdown menu */
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .dropdown .toolbarButton {
+    width: auto;
+    padding: 0 12px;
+  }
+  
+  .dropdownArrow {
+    font-size: 10px;
+    margin-left: 4px;
+  }
+  
+  .dropdownMenu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #2c4a6f;
+    min-width: 120px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  
+  .dropdownItem {
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-family: 'More Sugar', sans-serif;
+    font-weight: 100;
+    transition: background-color 0.2s ease;
+  }
+  
+  .dropdownItem:hover {
+    background-color: #3a5e8c;
+  }

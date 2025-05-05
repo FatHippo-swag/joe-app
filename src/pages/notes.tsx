@@ -1,4 +1,4 @@
-// Enhanced version of the Notes component with improved tab drag functionality
+// Enhanced version of the Notes component with text formatting features
 // src/pages/notes.tsx
 
 import { useState, useEffect, useRef } from 'react';
@@ -7,6 +7,7 @@ import Link from 'next/link';
 import styles from '../styles/Notes.module.css';
 import { Note } from '../types/Note';
 import HomeIcon from '../components/HomeIcon';
+import SimpleRichTextEditor from '../components/SimpleRichTextEditor';
 
 export default function Notes() {
   // State for managing notes
@@ -620,11 +621,9 @@ export default function Notes() {
       
       <div className={styles.noteContent}>
         {activeNote && (
-          <textarea
+          <SimpleRichTextEditor
             value={activeNote.content}
-            onChange={(e) => handleNoteChange(e.target.value)}
-            placeholder="type here..."
-            className={styles.noteTextarea}
+            onChange={handleNoteChange}
           />
         )}
       </div>
