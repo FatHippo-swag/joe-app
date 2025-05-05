@@ -1,6 +1,3 @@
-// Enhanced version of the Notes component with text formatting features
-// src/pages/notes.tsx
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -17,20 +14,18 @@ export default function Notes() {
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameNoteId, setRenameNoteId] = useState<string | null>(null);
   const [newNoteName, setNewNoteName] = useState('');
-  const [dragType, setDragType] = useState<'vertical' | 'horizontal' | null>(null);
+  const [dragType, setDragType] = useState<'horizontal' | null>(null);
   
   // Refs for drag handling
-  const dragStartY = useRef(0);
   const dragStartX = useRef(0);
   const isDragging = useRef(false);
   const hasDragMoved = useRef(false);
   const tabRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const tabsContainerRef = useRef<HTMLDivElement>(null);
-  const dragOffsetY = useRef<{ [key: string]: number }>({});
   const lastClickTime = useRef(0); // Track time between clicks for detecting double clicks
-  // Drag threshold (set to 1 for immediate response)
-  const dragThreshold = 1; // Near-zero threshold for detecting drag movement
-  const MAX_DRAG_DISTANCE = 100;
+  // Drag threshold
+  const dragThreshold = 5; // Small threshold for detecting horizontal drag movement
+  const MAX_TAB_EXTEND = 100; // Maximum tab extension for options display
   
   // Create a new note with current date as default name
   const createNewNote = useCallback(() => {
@@ -49,7 +44,7 @@ export default function Notes() {
       color: '#5f8bbf' // Default color
     };
     
-    // Reset any dragged tabs before creating a new one
+    // Reset any extended tabs before creating a new one
     if (draggedTabId) {
       resetTabPosition(draggedTabId);
     }
@@ -89,8 +84,6 @@ export default function Notes() {
   
   // Delete a note
   const deleteNote = (id: string) => {
-    console.log(`Deleting note with ID: ${id}`);
-    
     // Save current state before modification
     const currentNotes = [...notes];
     const isLastNote = currentNotes.length <= 1;
@@ -110,10 +103,6 @@ export default function Notes() {
     setNotes(updatedNotes);
     
     // Clean up any related data
-    if (dragOffsetY.current[id]) {
-      delete dragOffsetY.current[id];
-    }
-    
     if (id === draggedTabId) {
       setDraggedTabId(null);
       setDragType(null);
@@ -132,11 +121,8 @@ export default function Notes() {
     
     // If this was the last or only note, create a new one
     if (isLastNote) {
-      console.log("Last note deleted, creating a new one");
-      // Use setTimeout to ensure state updates have processed
-      setTimeout(() => {
-        createNewNote();
-      }, 50);
+      // Create a new default note after a short delay to ensure state updates have processed
+      setTimeout(createNewNote, 50);
     }
   };
   
@@ -176,9 +162,6 @@ export default function Notes() {
       tabElement.classList.remove(styles.tabFullyExtended);
       tabElement.classList.remove(styles.draggingTab);
       tabElement.classList.remove(styles.horizontalDrag);
-      
-      // Reset the stored offset
-      dragOffsetY.current[id] = 0;
     }
     
     if (id === draggedTabId) {
@@ -187,21 +170,41 @@ export default function Notes() {
     }
   };
   
-  // Update tab extension state based on drag distance
-  const updateTabExtensionState = (id: string, dragDistance: number) => {
+  // Toggle tab extension on double click (now our main way to show tab options)
+  const handleTabDoubleClick = (id: string, e: React.MouseEvent) => {
+    // Skip if we're clicking on an interactive element inside the tab
+    if ((e.target as HTMLElement).closest(`.${styles.tabOptionButton}`) || 
+        (e.target as HTMLElement).closest(`.${styles.colorOption}`)) {
+      return;
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Get the current tab element
     const tabElement = tabRefs.current[id];
     if (!tabElement) return;
     
-    // Remove all extension classes first
-    tabElement.classList.remove(styles.tabPartiallyExtended);
-    tabElement.classList.remove(styles.tabFullyExtended);
+    // Check if this tab is already extended
+    const isAlreadyExtended = tabElement.classList.contains(styles.tabFullyExtended);
     
-    // Add appropriate class based on drag distance
-    if (dragDistance >= 40) {
-      tabElement.classList.add(styles.tabFullyExtended);
-    } else if (dragDistance > 10) {
-      tabElement.classList.add(styles.tabPartiallyExtended);
+    // Reset any currently extended tab
+    if (draggedTabId) {
+      resetTabPosition(draggedTabId);
     }
+    
+    // If clicking the same tab that was extended, just close it
+    if (isAlreadyExtended && id === draggedTabId) {
+      return; // The tab was reset above
+    }
+    
+    // Otherwise, extend the clicked tab
+    setDraggedTabId(id);
+    tabElement.classList.add(styles.draggingTab);
+    tabElement.style.zIndex = '1000';
+    tabElement.style.transform = `translateY(-${MAX_TAB_EXTEND}px)`;
+    tabElement.style.height = `${40 + MAX_TAB_EXTEND}px`;
+    tabElement.classList.add(styles.tabFullyExtended);
   };
   
   // Calculate tab positions for horizontal reordering
@@ -238,36 +241,7 @@ export default function Notes() {
     });
   };
   
-  // Toggle tab extension on double click
-  const handleTabDoubleClick = (id: string, e: React.MouseEvent) => {
-    // Skip if we're clicking on an interactive element inside the tab
-    if ((e.target as HTMLElement).closest(`.${styles.tabOptionButton}`) || 
-        (e.target as HTMLElement).closest(`.${styles.colorOption}`)) {
-      return;
-    }
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Toggle tab extension
-    if (dragOffsetY.current[id] > 0) {
-      resetTabPosition(id);
-    } else {
-      // Fully extend the tab
-      setDraggedTabId(id);
-      const tabElement = tabRefs.current[id];
-      if (tabElement) {
-        tabElement.classList.add(styles.draggingTab);
-        tabElement.style.zIndex = '1000';
-        tabElement.style.transform = `translateY(-${MAX_DRAG_DISTANCE}px)`;
-        tabElement.style.height = `${40 + MAX_DRAG_DISTANCE}px`;
-        tabElement.classList.add(styles.tabFullyExtended);
-        dragOffsetY.current[id] = MAX_DRAG_DISTANCE;
-      }
-    }
-  };
-  
-  // Handle tab drag start
+  // Handle tab drag start - now only for horizontal reordering
   const handleDragStart = (e: React.MouseEvent, id: string) => {
     // Skip if we're clicking on an interactive element inside the tab
     if ((e.target as HTMLElement).closest(`.${styles.tabOptionButton}`) || 
@@ -287,31 +261,35 @@ export default function Notes() {
     }
     lastClickTime.current = now;
     
-    dragStartY.current = e.clientY;
+    // Set clicked tab as active immediately
+    setActiveNoteId(id);
+    
+    // If an extended tab is clicked, just reset it and treat as a normal click
+    const tabElement = tabRefs.current[id];
+    if (tabElement && (tabElement.classList.contains(styles.tabPartiallyExtended) || 
+                       tabElement.classList.contains(styles.tabFullyExtended))) {
+      resetTabPosition(id);
+      return;
+    }
+    
+    // Set up for horizontal drag
     dragStartX.current = e.clientX;
     isDragging.current = true;
     hasDragMoved.current = false;
-    
-    // Set clicked tab as active immediately
-    setActiveNoteId(id);
     
     // If we're clicking on a different tab than the dragged one, reset the current dragged tab
     if (draggedTabId && draggedTabId !== id) {
       resetTabPosition(draggedTabId);
     }
     
-    // Always set as dragged tab to ensure response on first try
+    // Set as dragged tab
     setDraggedTabId(id);
-    
-    // Initialize the drag offset if it doesn't exist
-    if (dragOffsetY.current[id] === undefined) {
-      dragOffsetY.current[id] = 0;
-    }
+    setDragType('horizontal');
     
     // Add dragging class to the tab
-    const tabElement = tabRefs.current[id];
     if (tabElement) {
       tabElement.classList.add(styles.draggingTab);
+      tabElement.classList.add(styles.horizontalDrag);
       tabElement.style.zIndex = '1000';
     }
     
@@ -319,113 +297,49 @@ export default function Notes() {
     document.addEventListener('mouseup', handleDragEnd);
   };
   
-  // Handle tab drag move
+  // Handle tab drag move - now only for horizontal reordering
   const handleDragMove = useCallback((e: MouseEvent) => {
-    if (!isDragging.current || !draggedTabId) return;
+    if (!isDragging.current || !draggedTabId || dragType !== 'horizontal') return;
     
-    // Calculate deltas
+    // Calculate delta
     const deltaX = e.clientX - dragStartX.current;
-    const deltaY = e.clientY - dragStartY.current;
     
-    // Any movement counts immediately - increase threshold for horizontal to make
-    // it easier to detect intentional horizontal drags
-    const horizontalThreshold = dragThreshold * 2;
-    const verticalThreshold = dragThreshold;
-    
-    if (Math.abs(deltaX) > horizontalThreshold || Math.abs(deltaY) > verticalThreshold) {
+    // Check if we've moved beyond threshold
+    if (Math.abs(deltaX) > dragThreshold) {
       hasDragMoved.current = true;
       
-      // Determine drag type if not already set
-      if (!dragType) {
-        // For horizontal drag to be detected, make it require more deliberate horizontal movement
-        // This makes horizontal reordering more intentional
-        const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY) * 1.5 && Math.abs(deltaX) > 10;
-        const dragDirection = isHorizontal ? 'horizontal' : 'vertical';
-        setDragType(dragDirection);
-      }
-    }
-    
-    // If we've moved but don't have a drag type yet, determine it
-    if (hasDragMoved.current) {
+      // Move the tab visually
       const tabElement = tabRefs.current[draggedTabId];
-      if (!tabElement) return;
-      
-      // If no drag type set yet, determine it based on initial movement direction
-      if (!dragType) {
-        // For horizontal drag to be detected, make it require more deliberate horizontal movement
-        const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY) * 1.5 && Math.abs(deltaX) > 10;
-        const newDragType = isHorizontal ? 'horizontal' : 'vertical';
-        setDragType(newDragType);
-        
-        // Apply immediate visual feedback
-        if (newDragType === 'vertical') {
-          // Start with a small visible movement
-          tabElement.style.transform = `translateY(-2px)`;
-          tabElement.style.height = `42px`;
-        } else {
-          // Add horizontal drag styling
-          tabElement.classList.add(styles.horizontalDrag);
-          tabElement.style.transform = `translateX(${deltaX}px)`;
-        }
-        return; // Wait for next frame with the set drag type
+      if (tabElement) {
+        tabElement.style.transform = `translateX(${deltaX}px)`;
       }
       
-      // Process based on the determined drag type
-      if (dragType === 'vertical') {
-        // Vertical dragging for tab options
-        // Make upward drag more responsive by amplifying movement slightly
-        const dragUpAmount = -deltaY * 1.2; // Amplify drag sensitivity
-        
-        // Get the current offset
-        const currentOffset = dragOffsetY.current[draggedTabId] || 0;
-        
-        // Calculate new drag distance by adding the new delta
-        const newOffset = Math.min(Math.max(0, currentOffset + dragUpAmount), MAX_DRAG_DISTANCE);
-        
-        // Update the tab position and height
-        tabElement.style.transform = `translateY(-${newOffset}px)`;
-        tabElement.style.height = `${40 + newOffset}px`;
-        
-        // Update extension state
-        updateTabExtensionState(draggedTabId, newOffset);
-        
-        // Store the new offset
-        dragOffsetY.current[draggedTabId] = newOffset;
-        
-        // Reset the drag start point to avoid accumulation
-        dragStartY.current = e.clientY;
-      } else if (dragType === 'horizontal') {
-        // Horizontal dragging for tab reordering
-        const tabPositions = getTabPositions();
-        const currentIndex = tabPositions.findIndex(pos => pos.id === draggedTabId);
-        if (currentIndex === -1) return;
-        
-        // Calculate the current position of the dragged tab
-        const offsetX = e.clientX - dragStartX.current;
-        const currentPosition = tabPositions[currentIndex].left + offsetX;
-        
-        // Move the tab visually
-        tabElement.style.transform = `translateX(${offsetX}px)`;
-        
-        // Check if we should reorder
-        for (let i = 0; i < tabPositions.length; i++) {
-          if (i !== currentIndex) {
-            const pos = tabPositions[i];
-            const centerPoint = pos.left + (pos.width / 2);
-            
-            if ((i < currentIndex && currentPosition < centerPoint) ||
-                (i > currentIndex && currentPosition > centerPoint)) {
-              // Reorder the tabs
-              reorderTabs(draggedTabId, i);
-              // Reset drag start position to avoid jumps
-              dragStartX.current = e.clientX;
-              return;
-            }
+      // Check if we should reorder
+      const tabPositions = getTabPositions();
+      const currentIndex = tabPositions.findIndex(pos => pos.id === draggedTabId);
+      if (currentIndex === -1) return;
+      
+      // Calculate the current position of the dragged tab
+      const currentPosition = tabPositions[currentIndex].left + deltaX;
+      
+      // Check if we should reorder
+      for (let i = 0; i < tabPositions.length; i++) {
+        if (i !== currentIndex) {
+          const pos = tabPositions[i];
+          const centerPoint = pos.left + (pos.width / 2);
+          
+          if ((i < currentIndex && currentPosition < centerPoint) ||
+              (i > currentIndex && currentPosition > centerPoint)) {
+            // Reorder the tabs
+            reorderTabs(draggedTabId, i);
+            // Reset drag start position to avoid jumps
+            dragStartX.current = e.clientX;
+            return;
           }
         }
       }
     }
-  }, [dragType, draggedTabId, dragThreshold, MAX_DRAG_DISTANCE]);
+  }, [dragType, draggedTabId, dragThreshold]);
   
   // Handle tab drag end
   const handleDragEnd = useCallback(() => {
@@ -437,72 +351,34 @@ export default function Notes() {
     if (!hasDragMoved.current) {
       // Simply make the tab active, but don't change its state
       setActiveNoteId(draggedTabId);
-    } else {
-      // Handle based on drag type
-      if (dragType === 'horizontal') {
-        // For horizontal drags, reset the transform properly
-        const tabElement = tabRefs.current[draggedTabId];
-        if (tabElement) {
-          // Add a snap animation class for smoother transitions
-          tabElement.classList.add(styles.tabSnapping);
-          
-          // Reset position and styles
-          tabElement.style.transform = 'translateX(0)';
-          tabElement.style.zIndex = '';
-          
-          // Remove animation class after transition
-          setTimeout(() => {
-            if (tabElement) {
-              tabElement.classList.remove(styles.tabSnapping);
-              tabElement.classList.remove(styles.draggingTab);
-              tabElement.classList.remove(styles.horizontalDrag);
-            }
-          }, 200);
-        }
-        setDraggedTabId(null);
-        setDragType(null);
-      } else if (dragType === 'vertical') {
-        // For vertical drags, check if we should snap to fully open or closed
-        const currentOffset = dragOffsetY.current[draggedTabId] || 0;
-        const tabElement = tabRefs.current[draggedTabId];
+    } else if (dragType === 'horizontal') {
+      // For horizontal drags, reset the transform properly
+      const tabElement = tabRefs.current[draggedTabId];
+      if (tabElement) {
+        // Add a snap animation class for smoother transitions
+        tabElement.classList.add(styles.tabSnapping);
         
-        if (tabElement) {
-          // Add a snap animation class for smoother transitions
-          tabElement.classList.add(styles.tabSnapping);
-          
-          if (currentOffset < 15) {
-            // If dragged only a little, collapse it
-            resetTabPosition(draggedTabId);
-          } else if (currentOffset < 50) {
-            // If dragged about a third of the way, snap to partially open
-            tabElement.style.transform = 'translateY(-40px)';
-            tabElement.style.height = '80px';
-            tabElement.classList.remove(styles.tabFullyExtended);
-            tabElement.classList.add(styles.tabPartiallyExtended);
-            dragOffsetY.current[draggedTabId] = 40;
-          } else {
-            // If dragged more than halfway, open it fully
-            tabElement.style.transform = `translateY(-${MAX_DRAG_DISTANCE}px)`;
-            tabElement.style.height = `${40 + MAX_DRAG_DISTANCE}px`;
-            tabElement.classList.remove(styles.tabPartiallyExtended);
-            tabElement.classList.add(styles.tabFullyExtended);
-            dragOffsetY.current[draggedTabId] = MAX_DRAG_DISTANCE;
+        // Reset position and styles
+        tabElement.style.transform = 'translateX(0)';
+        tabElement.style.zIndex = '';
+        
+        // Remove animation class after transition
+        setTimeout(() => {
+          if (tabElement) {
+            tabElement.classList.remove(styles.tabSnapping);
+            tabElement.classList.remove(styles.draggingTab);
+            tabElement.classList.remove(styles.horizontalDrag);
           }
-          
-          // Remove the snapping class after the animation completes
-          setTimeout(() => {
-            if (tabElement) {
-              tabElement.classList.remove(styles.tabSnapping);
-            }
-          }, 200);
-        }
+        }, 200);
       }
+      setDraggedTabId(null);
+      setDragType(null);
     }
     
     hasDragMoved.current = false;
     document.removeEventListener('mousemove', handleDragMove);
     document.removeEventListener('mouseup', handleDragEnd);
-  }, [draggedTabId, dragType, MAX_DRAG_DISTANCE]);
+  }, [draggedTabId, dragType]);
   
   // Handle tab click
   const handleTabClick = (id: string) => {
@@ -519,7 +395,8 @@ export default function Notes() {
     const isOutsideTabs = !clickedElement.closest(`.${styles.tab}`) && 
                           !clickedElement.closest(`.${styles.addTab}`) && 
                           !clickedElement.closest(`.${styles.tabOptions}`) && 
-                          !clickedElement.closest(`.${styles.colorPicker}`);
+                          !clickedElement.closest(`.${styles.colorPicker}`) &&
+                          !clickedElement.closest(`.${styles.modalContent}`);
     
     if (isOutsideTabs) {
       resetTabPosition(draggedTabId);
@@ -553,9 +430,6 @@ export default function Notes() {
       // Create a default note if no notes exist
       createNewNote();
     }
-    
-    // Initialize dragOffsetY ref
-    dragOffsetY.current = {};
     
     // Add document click handler to reset tabs when clicking outside
     document.addEventListener('click', handleDocumentClick);
@@ -635,15 +509,9 @@ export default function Notes() {
                   <button 
                     className={styles.tabOptionButton} 
                     onClick={(e) => {
-                      // Prevent any parent event handlers from firing
                       e.preventDefault();
                       e.stopPropagation();
-                      
-                      // Use setTimeout to ensure this executes after the click event is fully processed
-                      setTimeout(() => {
-                        // Call delete function
-                        deleteNote(note.id);
-                      }, 10);
+                      deleteNote(note.id);
                     }}
                     title="Delete"
                     type="button"

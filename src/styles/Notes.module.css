@@ -338,9 +338,6 @@
 }
 
 /* Feedback for drag interactions */
-.tab:active {
-  cursor: grabbing;
-}
 .tabSnapping {
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
               height 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
@@ -353,12 +350,6 @@
   cursor: grab;
 }
 
-.tab:active {
+.horizontalDrag {
   cursor: grabbing;
-}
-
-/* Horizontal drag styling */
-.draggingTab.horizontalDrag {
-  z-index: 1000;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.4);
 }
