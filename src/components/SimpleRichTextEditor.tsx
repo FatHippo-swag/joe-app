@@ -454,7 +454,7 @@ const SimpleRichTextEditor: React.FC<SimpleRichTextEditorProps> = ({ value, onCh
         onInput={handleContentChange}
         onBlur={handleContentChange}
         onKeyDown={handleKeyDown}
-        placeholder="Type here..."
+        data-placeholder="Type here..."
         spellCheck={false}
       />
     </div>
