@@ -9,7 +9,6 @@ interface SimpleRichTextEditorProps {
 const SimpleRichTextEditor: React.FC<SimpleRichTextEditorProps> = ({ value, onChange }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isBold, setIsBold] = useState(false);
-  const [currentSize, setCurrentSize] = useState<string>('normal');
   const [showSizeMenu, setShowSizeMenu] = useState(false);
   
   // Update editor content when value prop changes
@@ -216,9 +215,6 @@ const SimpleRichTextEditor: React.FC<SimpleRichTextEditorProps> = ({ value, onCh
             span.appendChild(document.createTextNode(selectedText));
             range.insertNode(span);
             
-            // Update size state
-            setCurrentSize(size);
-            
             // Save changes
             handleContentChange();
           }
@@ -252,7 +248,7 @@ const SimpleRichTextEditor: React.FC<SimpleRichTextEditorProps> = ({ value, onCh
       handleContentChange();
     }
   };
-
+  
   // Add task item
   const addTaskItem = () => {
     if (editorRef.current) {

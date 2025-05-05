@@ -1,7 +1,7 @@
 // Enhanced version of the Notes component with text formatting features
 // src/pages/notes.tsx
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import styles from '../styles/Notes.module.css';
@@ -33,7 +33,7 @@ export default function Notes() {
   const MAX_DRAG_DISTANCE = 100;
   
   // Create a new note with current date as default name
-  const createNewNote = () => {
+  const createNewNote = useCallback(() => {
     const today = new Date();
     const formattedDate = today.toLocaleDateString('en-US', {
       month: 'long',
@@ -56,7 +56,7 @@ export default function Notes() {
     
     setNotes(prevNotes => [...prevNotes, newNote]);
     setActiveNoteId(newNote.id);
-  };
+  }, [draggedTabId]);
   
   // Handle note content change
   const handleNoteChange = (content: string) => {
@@ -153,13 +153,6 @@ export default function Notes() {
     if (id === draggedTabId) {
       setDraggedTabId(null);
       setDragType(null);
-    }
-  };
-  
-  // Reset all tabs
-  const resetAllTabs = () => {
-    if (draggedTabId) {
-      resetTabPosition(draggedTabId);
     }
   };
   
@@ -276,9 +269,6 @@ export default function Notes() {
       resetTabPosition(draggedTabId);
     }
     
-    // If tab is already extended, prepare it for further dragging
-    const currentOffset = dragOffsetY.current[id] || 0;
-    
     // Always set as dragged tab to ensure response on first try
     setDraggedTabId(id);
     
@@ -299,7 +289,7 @@ export default function Notes() {
   };
   
   // Handle tab drag move
-  const handleDragMove = (e: MouseEvent) => {
+  const handleDragMove = useCallback((e: MouseEvent) => {
     if (!isDragging.current || !draggedTabId) return;
     
     // Calculate deltas
@@ -347,13 +337,10 @@ export default function Notes() {
         const dragUpAmount = -deltaY * 1.2; // Amplify drag sensitivity
         
         // Get the current offset
-        let currentOffset = dragOffsetY.current[draggedTabId] || 0;
+        const currentOffset = dragOffsetY.current[draggedTabId] || 0;
         
         // Calculate new drag distance by adding the new delta
-        let newOffset = currentOffset + dragUpAmount;
-        
-        // Constrain drag distance to be between 0 and MAX_DRAG_DISTANCE
-        newOffset = Math.min(Math.max(0, newOffset), MAX_DRAG_DISTANCE);
+        const newOffset = Math.min(Math.max(0, currentOffset + dragUpAmount), MAX_DRAG_DISTANCE);
         
         // Update the tab position and height
         tabElement.style.transform = `translateY(-${newOffset}px)`;
@@ -398,10 +385,10 @@ export default function Notes() {
         }
       }
     }
-  };
+  }, [dragType, draggedTabId, dragThreshold, MAX_DRAG_DISTANCE]);
   
   // Handle tab drag end
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
     if (!draggedTabId) return;
     
     isDragging.current = false;
@@ -461,7 +448,7 @@ export default function Notes() {
     
     document.removeEventListener('mousemove', handleDragMove);
     document.removeEventListener('mouseup', handleDragEnd);
-  };
+  }, [draggedTabId, dragType, MAX_DRAG_DISTANCE]);
   
   // Handle tab click
   const handleTabClick = (id: string) => {
@@ -470,7 +457,7 @@ export default function Notes() {
   };
   
   // Handle document click to reset tabs when clicking outside
-  const handleDocumentClick = (e: MouseEvent) => {
+  const handleDocumentClick = useCallback((e: MouseEvent) => {
     if (!draggedTabId) return;
     
     // Check if clicked outside tabs
@@ -483,7 +470,7 @@ export default function Notes() {
     if (isOutsideTabs) {
       resetTabPosition(draggedTabId);
     }
-  };
+  }, [draggedTabId]);
   
   // Load notes from localStorage on component mount
   useEffect(() => {
@@ -492,7 +479,7 @@ export default function Notes() {
       try {
         const parsedNotes = JSON.parse(savedNotes);
         // Convert string dates back to Date objects
-        const processedNotes = parsedNotes.map((note: any) => ({
+        const processedNotes = parsedNotes.map((note: { id: string; name: string; content: string; createdAt: string; color?: string }) => ({
           ...note,
           createdAt: new Date(note.createdAt)
         }));
@@ -522,7 +509,7 @@ export default function Notes() {
     return () => {
       document.removeEventListener('click', handleDocumentClick);
     };
-  }, []);
+  }, [createNewNote, handleDocumentClick]);
   
   // Cleanup event listeners on component unmount
   useEffect(() => {
@@ -531,7 +518,7 @@ export default function Notes() {
       document.removeEventListener('mouseup', handleDragEnd);
       document.removeEventListener('click', handleDocumentClick);
     };
-  }, []);
+  }, [handleDragMove, handleDragEnd, handleDocumentClick]);
   
   // Save notes to localStorage whenever notes change
   useEffect(() => {
