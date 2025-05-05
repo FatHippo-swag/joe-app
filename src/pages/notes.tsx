@@ -89,24 +89,54 @@ export default function Notes() {
   
   // Delete a note
   const deleteNote = (id: string) => {
-    setNotes(prevNotes => prevNotes.filter(note => note.id !== id));
+    console.log(`Deleting note with ID: ${id}`);
     
-    // Delete the drag offset for this tab
+    // Save current state before modification
+    const currentNotes = [...notes];
+    const isLastNote = currentNotes.length <= 1;
+    const isActiveNote = activeNoteId === id;
+    
+    // Find the index of the note to be deleted
+    const noteIndex = currentNotes.findIndex(note => note.id === id);
+    if (noteIndex === -1) {
+      console.error("Note not found, cannot delete");
+      return;
+    }
+    
+    // Create a new array without the deleted note
+    const updatedNotes = currentNotes.filter(note => note.id !== id);
+    
+    // Update the notes state
+    setNotes(updatedNotes);
+    
+    // Clean up any related data
     if (dragOffsetY.current[id]) {
       delete dragOffsetY.current[id];
     }
     
     if (id === draggedTabId) {
       setDraggedTabId(null);
+      setDragType(null);
     }
     
-    // If the active note is deleted, set the first note as active
-    if (activeNoteId === id && notes.length > 1) {
-      const remainingNotes = notes.filter(note => note.id !== id);
-      setActiveNoteId(remainingNotes[0].id);
-    } else if (notes.length === 1) {
-      // If this was the last note, create a new one
-      createNewNote();
+    // Handle active note selection
+    if (isActiveNote) {
+      if (updatedNotes.length > 0) {
+        // Set the next note as active, or the previous if this was the last note
+        const newActiveIndex = Math.min(noteIndex, updatedNotes.length - 1);
+        setActiveNoteId(updatedNotes[newActiveIndex].id);
+      } else {
+        setActiveNoteId(null);
+      }
+    }
+    
+    // If this was the last or only note, create a new one
+    if (isLastNote) {
+      console.log("Last note deleted, creating a new one");
+      // Use setTimeout to ensure state updates have processed
+      setTimeout(() => {
+        createNewNote();
+      }, 50);
     }
   };
   
@@ -145,6 +175,7 @@ export default function Notes() {
       tabElement.classList.remove(styles.tabPartiallyExtended);
       tabElement.classList.remove(styles.tabFullyExtended);
       tabElement.classList.remove(styles.draggingTab);
+      tabElement.classList.remove(styles.horizontalDrag);
       
       // Reset the stored offset
       dragOffsetY.current[id] = 0;
@@ -296,15 +327,20 @@ export default function Notes() {
     const deltaX = e.clientX - dragStartX.current;
     const deltaY = e.clientY - dragStartY.current;
     
-    // Any movement counts immediately
-    if (Math.abs(deltaX) > dragThreshold || Math.abs(deltaY) > dragThreshold) {
+    // Any movement counts immediately - increase threshold for horizontal to make
+    // it easier to detect intentional horizontal drags
+    const horizontalThreshold = dragThreshold * 2;
+    const verticalThreshold = dragThreshold;
+    
+    if (Math.abs(deltaX) > horizontalThreshold || Math.abs(deltaY) > verticalThreshold) {
       hasDragMoved.current = true;
       
       // Determine drag type if not already set
       if (!dragType) {
-        // Determine if this is predominantly horizontal or vertical dragging
-        // Initial movement direction determines the drag type for the entire drag
-        const dragDirection = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
+        // For horizontal drag to be detected, make it require more deliberate horizontal movement
+        // This makes horizontal reordering more intentional
+        const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY) * 1.5 && Math.abs(deltaX) > 10;
+        const dragDirection = isHorizontal ? 'horizontal' : 'vertical';
         setDragType(dragDirection);
       }
     }
@@ -316,7 +352,9 @@ export default function Notes() {
       
       // If no drag type set yet, determine it based on initial movement direction
       if (!dragType) {
-        const newDragType = Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
+        // For horizontal drag to be detected, make it require more deliberate horizontal movement
+        const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY) * 1.5 && Math.abs(deltaX) > 10;
+        const newDragType = isHorizontal ? 'horizontal' : 'vertical';
         setDragType(newDragType);
         
         // Apply immediate visual feedback
@@ -325,6 +363,8 @@ export default function Notes() {
           tabElement.style.transform = `translateY(-2px)`;
           tabElement.style.height = `42px`;
         } else {
+          // Add horizontal drag styling
+          tabElement.classList.add(styles.horizontalDrag);
           tabElement.style.transform = `translateX(${deltaX}px)`;
         }
         return; // Wait for next frame with the set drag type
@@ -400,11 +440,24 @@ export default function Notes() {
     } else {
       // Handle based on drag type
       if (dragType === 'horizontal') {
-        // For horizontal drags, reset the transform
+        // For horizontal drags, reset the transform properly
         const tabElement = tabRefs.current[draggedTabId];
         if (tabElement) {
-          tabElement.style.transform = 'translateY(0)';
+          // Add a snap animation class for smoother transitions
+          tabElement.classList.add(styles.tabSnapping);
+          
+          // Reset position and styles
+          tabElement.style.transform = 'translateX(0)';
           tabElement.style.zIndex = '';
+          
+          // Remove animation class after transition
+          setTimeout(() => {
+            if (tabElement) {
+              tabElement.classList.remove(styles.tabSnapping);
+              tabElement.classList.remove(styles.draggingTab);
+              tabElement.classList.remove(styles.horizontalDrag);
+            }
+          }, 200);
         }
         setDraggedTabId(null);
         setDragType(null);
@@ -446,6 +499,7 @@ export default function Notes() {
       }
     }
     
+    hasDragMoved.current = false;
     document.removeEventListener('mousemove', handleDragMove);
     document.removeEventListener('mouseup', handleDragEnd);
   }, [draggedTabId, dragType, MAX_DRAG_DISTANCE]);
@@ -549,10 +603,10 @@ export default function Notes() {
       
       <div className={styles.tabsContainer} ref={tabsContainerRef}>
         <div className={styles.tabs}>
-          {notes.map(note => (
+          {notes.map((note, index) => (
             <div 
               id={`tab-${note.id}`}
-              key={note.id} 
+              key={`tab-${note.id}-${index}`} // Add index to ensure proper re-rendering
               className={`${styles.tab} ${note.id === activeNoteId ? styles.activeTab : ''}`}
               onClick={() => handleTabClick(note.id)}
               onMouseDown={(e) => handleDragStart(e, note.id)}
@@ -565,8 +619,13 @@ export default function Notes() {
                 <div className={styles.tabOptions}>
                   <button 
                     className={styles.tabOptionButton} 
-                    onClick={(e) => { e.stopPropagation(); openRenameModal(note.id); }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openRenameModal(note.id);
+                    }}
                     title="Rename"
+                    type="button"
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="white"/>
@@ -575,8 +634,19 @@ export default function Notes() {
                   
                   <button 
                     className={styles.tabOptionButton} 
-                    onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}
+                    onClick={(e) => {
+                      // Prevent any parent event handlers from firing
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      // Use setTimeout to ensure this executes after the click event is fully processed
+                      setTimeout(() => {
+                        // Call delete function
+                        deleteNote(note.id);
+                      }, 10);
+                    }}
                     title="Delete"
+                    type="button"
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="white"/>
@@ -590,7 +660,11 @@ export default function Notes() {
                       key={color}
                       className={`${styles.colorOption} ${note.color === color ? styles.selected : ''}`}
                       style={{ backgroundColor: color }}
-                      onClick={(e) => { e.stopPropagation(); handleNoteColorChange(note.id, color); }}
+                      onClick={(e) => { 
+                        e.preventDefault();
+                        e.stopPropagation(); 
+                        handleNoteColorChange(note.id, color); 
+                      }}
                     />
                   ))}
                 </div>

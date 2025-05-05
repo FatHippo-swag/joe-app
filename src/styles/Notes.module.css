@@ -341,3 +341,24 @@
 .tab:active {
   cursor: grabbing;
 }
+.tabSnapping {
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              height 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+              left 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+.tab:hover {
+  background-color: #7aa3d2;
+  opacity: 0.8;
+  cursor: grab;
+}
+
+.tab:active {
+  cursor: grabbing;
+}
+
+/* Horizontal drag styling */
+.draggingTab.horizontalDrag {
+  z-index: 1000;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+}
