@@ -557,7 +557,7 @@ export default function Notes() {
               onClick={() => handleTabClick(note.id)}
               onMouseDown={(e) => handleDragStart(e, note.id)}
               style={{ backgroundColor: note.color || '#5f8bbf' }}
-              ref={el => tabRefs.current[note.id] = el}
+              ref={el => { tabRefs.current[note.id] = el; }}
             >
               <div className={styles.tabContent}>
                 <div className={styles.tabName}>{note.name}</div>
