@@ -353,3 +353,29 @@
 .horizontalDrag {
   cursor: grabbing;
 }
+
+.tabsContainer {
+  margin-bottom: 8px !important; /* Use !important to ensure this takes precedence */
+}
+
+/* Ensure no extra padding in content wrapper */
+.noteContent {
+  padding-top: 0 !important;
+}
+
+/* These styles help with tab display */
+.tab {
+  background-color: #5f8bbf;
+  border-radius: 0.5rem 0.5rem 0 0;
+  margin-right: 0.5rem;
+}
+
+.activeTab {
+  opacity: 1 !important;
+  height: 45px !important;
+}
+
+.toolbar {
+  border-top: 1px solid #3a5e8c !important;
+  border-radius: 4px 4px 0 0 !important;
+}

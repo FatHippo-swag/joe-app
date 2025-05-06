@@ -1,3 +1,4 @@
+// src/pages/notes.tsx with fixed delete function
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -82,8 +83,10 @@ export default function Notes() {
     );
   };
   
-  // Delete a note
+  // Delete a note - ENHANCED FIXED FUNCTION
   const deleteNote = (id: string) => {
+    console.log(`Deleting note with ID: ${id}`);
+    
     // Save current state before modification
     const currentNotes = [...notes];
     const isLastNote = currentNotes.length <= 1;
@@ -101,6 +104,9 @@ export default function Notes() {
     
     // Update the notes state
     setNotes(updatedNotes);
+    
+    // Directly update localStorage to ensure changes are persisted immediately
+    localStorage.setItem('notes', JSON.stringify(updatedNotes));
     
     // Clean up any related data
     if (id === draggedTabId) {
@@ -121,8 +127,11 @@ export default function Notes() {
     
     // If this was the last or only note, create a new one
     if (isLastNote) {
-      // Create a new default note after a short delay to ensure state updates have processed
-      setTimeout(createNewNote, 50);
+      console.log("Last note deleted, creating a new one");
+      // Use setTimeout to ensure state updates have processed
+      setTimeout(() => {
+        createNewNote();
+      }, 50);
     }
   };
   
@@ -170,7 +179,7 @@ export default function Notes() {
     }
   };
   
-  // Toggle tab extension on double click (now our main way to show tab options)
+  // Toggle tab extension on double click
   const handleTabDoubleClick = (id: string, e: React.MouseEvent) => {
     // Skip if we're clicking on an interactive element inside the tab
     if ((e.target as HTMLElement).closest(`.${styles.tabOptionButton}`) || 
@@ -506,12 +515,19 @@ export default function Notes() {
                     </svg>
                   </button>
                   
+                  {/* FIXED DELETE BUTTON */}
                   <button 
                     className={styles.tabOptionButton} 
                     onClick={(e) => {
+                      // Prevent any parent event handlers from firing
                       e.preventDefault();
                       e.stopPropagation();
-                      deleteNote(note.id);
+                      
+                      // Use setTimeout to ensure this executes after the click event is fully processed
+                      setTimeout(() => {
+                        // Call delete function
+                        deleteNote(note.id);
+                      }, 10);
                     }}
                     title="Delete"
                     type="button"

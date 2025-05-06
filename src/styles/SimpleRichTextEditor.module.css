@@ -225,3 +225,19 @@
   .dropdownItem:hover {
     background-color: #3a5e8c;
   }
+  
+  .editor {
+    margin-top: 0 !important;
+  }
+  
+  /* Make toolbar stand out and connect directly to tabs */
+  .toolbar {
+    margin-top: 0 !important;
+    background-color: #2c4a6f;
+    border-top: none !important;
+  }
+  
+  /* Make content padding consistent */
+  .content {
+    padding: 16px;
+  }
