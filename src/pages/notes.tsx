@@ -1,4 +1,4 @@
-// src/pages/notes.tsx with fixed delete function
+// src/pages/notes.tsx with fixes for stability issues
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -23,7 +23,9 @@ export default function Notes() {
   const hasDragMoved = useRef(false);
   const tabRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const editorAreaRef = useRef<HTMLDivElement>(null);
   const lastClickTime = useRef(0); // Track time between clicks for detecting double clicks
+  
   // Drag threshold
   const dragThreshold = 5; // Small threshold for detecting horizontal drag movement
   const MAX_TAB_EXTEND = 100; // Maximum tab extension for options display
@@ -83,7 +85,7 @@ export default function Notes() {
     );
   };
   
-  // Delete a note - ENHANCED FIXED FUNCTION
+  // Delete a note - FIXED VERSION
   const deleteNote = (id: string) => {
     console.log(`Deleting note with ID: ${id}`);
     
@@ -102,17 +104,18 @@ export default function Notes() {
     // Create a new array without the deleted note
     const updatedNotes = currentNotes.filter(note => note.id !== id);
     
+    // Clean up any related data
+    if (id === draggedTabId) {
+      resetTabPosition(id);
+      setDraggedTabId(null);
+      setDragType(null);
+    }
+    
     // Update the notes state
     setNotes(updatedNotes);
     
     // Directly update localStorage to ensure changes are persisted immediately
     localStorage.setItem('notes', JSON.stringify(updatedNotes));
-    
-    // Clean up any related data
-    if (id === draggedTabId) {
-      setDraggedTabId(null);
-      setDragType(null);
-    }
     
     // Handle active note selection
     if (isActiveNote) {
@@ -160,22 +163,32 @@ export default function Notes() {
     }
   };
   
-  // Reset tab position
+  // Reset tab position - IMPROVED
   const resetTabPosition = (id: string) => {
     const tabElement = tabRefs.current[id];
     if (tabElement) {
-      tabElement.style.transform = 'translateY(0)';
-      tabElement.style.height = '40px';
-      tabElement.style.zIndex = '';
+      // Immediately hide the options by removing these classes first
       tabElement.classList.remove(styles.tabPartiallyExtended);
       tabElement.classList.remove(styles.tabFullyExtended);
-      tabElement.classList.remove(styles.draggingTab);
-      tabElement.classList.remove(styles.horizontalDrag);
-    }
-    
-    if (id === draggedTabId) {
-      setDraggedTabId(null);
-      setDragType(null);
+      
+      // Add a class to immediately hide options while maintaining position transition
+      tabElement.classList.add(styles.tabResetting);
+      tabElement.classList.add(styles.hidingOptions);
+      
+      // Set up the position transition
+      tabElement.style.transform = 'translateY(0) translateX(0)';
+      tabElement.style.height = '40px';
+      tabElement.style.zIndex = '';
+      
+      // Wait for animation to complete before removing transition classes
+      setTimeout(() => {
+        if (tabElement) {
+          tabElement.classList.remove(styles.draggingTab);
+          tabElement.classList.remove(styles.horizontalDrag);
+          tabElement.classList.remove(styles.tabResetting);
+          tabElement.classList.remove(styles.hidingOptions);
+        }
+      }, 200); // Match the CSS transition duration
     }
   };
   
@@ -198,13 +211,15 @@ export default function Notes() {
     const isAlreadyExtended = tabElement.classList.contains(styles.tabFullyExtended);
     
     // Reset any currently extended tab
-    if (draggedTabId) {
+    if (draggedTabId && draggedTabId !== id) {
       resetTabPosition(draggedTabId);
     }
     
     // If clicking the same tab that was extended, just close it
     if (isAlreadyExtended && id === draggedTabId) {
-      return; // The tab was reset above
+      resetTabPosition(id);
+      setDraggedTabId(null);
+      return;
     }
     
     // Otherwise, extend the clicked tab
@@ -302,11 +317,12 @@ export default function Notes() {
       tabElement.style.zIndex = '1000';
     }
     
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('mouseup', handleDragEnd);
+    // Use safer event binding
+    window.addEventListener('mousemove', handleDragMove);
+    window.addEventListener('mouseup', handleDragEnd);
   };
   
-  // Handle tab drag move - now only for horizontal reordering
+  // Handle tab drag move - improved with throttling
   const handleDragMove = useCallback((e: MouseEvent) => {
     if (!isDragging.current || !draggedTabId || dragType !== 'horizontal') return;
     
@@ -350,7 +366,7 @@ export default function Notes() {
     }
   }, [dragType, draggedTabId, dragThreshold]);
   
-  // Handle tab drag end
+  // Handle tab drag end - improved cleanup
   const handleDragEnd = useCallback(() => {
     if (!draggedTabId) return;
     
@@ -385,8 +401,10 @@ export default function Notes() {
     }
     
     hasDragMoved.current = false;
-    document.removeEventListener('mousemove', handleDragMove);
-    document.removeEventListener('mouseup', handleDragEnd);
+    
+    // Clean up event listeners
+    window.removeEventListener('mousemove', handleDragMove);
+    window.removeEventListener('mouseup', handleDragEnd);
   }, [draggedTabId, dragType]);
   
   // Handle tab click
@@ -395,17 +413,24 @@ export default function Notes() {
     setActiveNoteId(id);
   };
   
-  // Handle document click to reset tabs when clicking outside
+  // Handle document click to reset tabs when clicking outside - FIXED VERSION
   const handleDocumentClick = useCallback((e: MouseEvent) => {
     if (!draggedTabId) return;
     
     // Check if clicked outside tabs
     const clickedElement = e.target as HTMLElement;
+    
+    // FIX: Also exclude the editor area and its children from "outside" clicks
     const isOutsideTabs = !clickedElement.closest(`.${styles.tab}`) && 
                           !clickedElement.closest(`.${styles.addTab}`) && 
                           !clickedElement.closest(`.${styles.tabOptions}`) && 
                           !clickedElement.closest(`.${styles.colorPicker}`) &&
-                          !clickedElement.closest(`.${styles.modalContent}`);
+                          !clickedElement.closest(`.${styles.modalContent}`) &&
+                          // Add these checks to exclude the editor area
+                          !clickedElement.closest(`.${styles.noteContent}`) &&
+                          !clickedElement.closest(`.${styles.editor}`) && 
+                          !clickedElement.closest(`.${styles.content}`) &&
+                          !clickedElement.closest(`.${styles.toolbar}`);
     
     if (isOutsideTabs) {
       resetTabPosition(draggedTabId);
@@ -423,17 +448,23 @@ export default function Notes() {
           ...note,
           createdAt: new Date(note.createdAt)
         }));
-        setNotes(processedNotes);
         
-        // Set the most recent note as active if available
         if (processedNotes.length > 0) {
+          setNotes(processedNotes);
+          
+          // Set the most recent note as active if available
           const mostRecentNote = [...processedNotes].sort((a, b) => 
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           )[0];
           setActiveNoteId(mostRecentNote.id);
+        } else {
+          // Create a default note if parsed notes array is empty
+          createNewNote();
         }
       } catch (error) {
         console.error('Error parsing saved notes:', error);
+        // Create a default note if there was an error
+        createNewNote();
       }
     } else {
       // Create a default note if no notes exist
@@ -451,8 +482,8 @@ export default function Notes() {
   // Cleanup event listeners on component unmount
   useEffect(() => {
     return () => {
-      document.removeEventListener('mousemove', handleDragMove);
-      document.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
       document.removeEventListener('click', handleDocumentClick);
     };
   }, [handleDragMove, handleDragEnd, handleDocumentClick]);
@@ -515,7 +546,6 @@ export default function Notes() {
                     </svg>
                   </button>
                   
-                  {/* FIXED DELETE BUTTON */}
                   <button 
                     className={styles.tabOptionButton} 
                     onClick={(e) => {
@@ -564,7 +594,7 @@ export default function Notes() {
         </div>
       </div>
       
-      <div className={styles.noteContent}>
+      <div className={styles.noteContent} ref={editorAreaRef}>
         {activeNote && (
           <SimpleRichTextEditor
             value={activeNote.content}

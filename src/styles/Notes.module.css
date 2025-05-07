@@ -1,4 +1,17 @@
 /* Define variables within a class instead of :root for CSS Module compatibility */
+.tabResetting {
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              height 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+/* Immediately hide options when tab is resetting */
+.hidingOptions .tabOptions,
+.hidingOptions .colorPicker {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  transition: opacity 0.05s ease, visibility 0.05s ease !important;
+}
+
 .container {
   /* Color variables for consistency */
   --tab-color-default: #5f8bbf;
@@ -393,4 +406,66 @@
 .horizontalDrag {
   cursor: grabbing;
   background-color: var(--tab-color-active) !important; /* Ensure background color is maintained */
+}
+
+.tabResetting {
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+              height 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+/* Improve z-index values for better layering */
+.container {
+  --tab-color-default: #5f8bbf;
+  --tab-color-active: #7aa3d2;
+  --tab-color-hover: #7aa3d2;
+  
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #111c2e;
+  color: white;
+  position: relative; /* Ensure proper stacking context */
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: #2c4a6f;
+  position: relative;
+  z-index: 10; /* Increase to ensure it's above tabs except when tabs are being dragged */
+}
+
+.tabsContainer {
+  background-color: #111c2e;
+  padding: 1rem 2rem 0;
+  position: relative;
+  z-index: 20; /* Increase z-index to ensure tabs are above content */
+  border-bottom: none;
+  height: 40px; /* Fixed height for tab container */
+  min-height: 40px; /* Ensure minimum height */
+  margin-bottom: 16px !important; /* Increased space between tabs and toolbar */
+  overflow: visible; /* Allow tabs to visually overflow */
+}
+
+.noteContent {
+  position: relative;
+  z-index: 5; /* Lower than tabs but above other elements */
+}
+
+/* Improve pointer events for tab content elements */
+.tabContent, 
+.tabOptions, 
+.colorPicker, 
+.tabName,
+.tabOptionButton, 
+.colorOption {
+  pointer-events: auto; /* Ensure these elements receive click events */
+}
+
+/* Improve the dragging visual feedback */
+.draggingTab {
+  z-index: 1000 !important; 
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  cursor: grabbing !important;
 }
