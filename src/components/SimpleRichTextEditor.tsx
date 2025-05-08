@@ -17,20 +17,91 @@ const SimpleRichTextEditor: React.FC<SimpleRichTextEditorProps> = ({ value, onCh
       // Only update if content is different to prevent cursor jumping
       if (editorRef.current.innerHTML !== value) {
         editorRef.current.innerHTML = value || '';
+        
+        // Re-attach event listeners to all checkboxes after content is updated
+        attachCheckboxEventListeners();
       }
     }
   }, [value]);
+  
+  // Function to attach event listeners to all checkboxes
+  const attachCheckboxEventListeners = () => {
+    if (!editorRef.current) return;
+    
+    // Find all checkbox elements
+    const checkboxes = editorRef.current.querySelectorAll(`.${styles.checkbox}`);
+    
+    // Attach click event to each checkbox
+    checkboxes.forEach(checkbox => {
+      // Remove existing event listeners first to prevent duplicates
+      checkbox.removeEventListener('click', toggleTaskCheckbox);
+      // Add event listener
+      checkbox.addEventListener('click', toggleTaskCheckbox);
+    });
+  };
 
   // Function to save content changes
   const handleContentChange = () => {
     if (editorRef.current) {
       const content = editorRef.current.innerHTML;
       onChange(content);
+      
+      // Re-attach checkbox event listeners after content change
+      setTimeout(attachCheckboxEventListeners, 0);
     }
+  };
+  
+  // Helper function for toggling task checkboxes
+  const toggleTaskCheckbox = (e: Event) => {
+    const target = e.target as HTMLElement;
+    
+    // Update checkbox state and apply styling
+    if (target.innerHTML === '☐') {
+      target.innerHTML = '☑';
+      if (target.nextElementSibling) {
+        target.nextElementSibling.classList.add(styles.taskCompleted);
+      }
+    } else {
+      target.innerHTML = '☐';
+      if (target.nextElementSibling) {
+        target.nextElementSibling.classList.remove(styles.taskCompleted);
+      }
+    }
+    
+    // Save the change
+    handleContentChange();
   };
   
   // Handle keyboard events
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    // Handle Shift+Enter for line breaks within task items
+    if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      
+      // Get the current selection
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const parentElement = range.commonAncestorContainer.parentElement;
+        
+        // Check if we're inside a task item
+        if (parentElement && parentElement.closest(`.${styles.taskItem}`)) {
+          // Insert a line break
+          const br = document.createElement('br');
+          range.insertNode(br);
+          
+          // Move cursor after the line break
+          range.setStartAfter(br);
+          range.setEndAfter(br);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          
+          handleContentChange();
+          return;
+        }
+      }
+    }
+    
     // Handle Enter key for line breaks
     if (e.key === 'Enter') {
       // Get the current selection
@@ -52,17 +123,7 @@ const SimpleRichTextEditor: React.FC<SimpleRichTextEditorProps> = ({ value, onCh
           checkbox.className = styles.checkbox;
           checkbox.innerHTML = '☐';
           checkbox.contentEditable = 'false';
-          checkbox.addEventListener('click', (clickEvent) => {
-            const target = clickEvent.target as HTMLElement;
-            if (target.innerHTML === '☐') {
-              target.innerHTML = '☑';
-              target.nextElementSibling?.classList.add(styles.taskCompleted);
-            } else {
-              target.innerHTML = '☐';
-              target.nextElementSibling?.classList.remove(styles.taskCompleted);
-            }
-            handleContentChange();
-          });
+          checkbox.addEventListener('click', toggleTaskCheckbox);
           
           // Create task text
           const taskText = document.createElement('span');
@@ -341,19 +402,21 @@ const SimpleRichTextEditor: React.FC<SimpleRichTextEditorProps> = ({ value, onCh
       }
     }
   };
-  
-  // Helper function for toggling task checkboxes
-  const toggleTaskCheckbox = (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.innerHTML === '☐') {
-      target.innerHTML = '☑';
-      target.nextElementSibling?.classList.add(styles.taskCompleted);
-    } else {
-      target.innerHTML = '☐';
-      target.nextElementSibling?.classList.remove(styles.taskCompleted);
-    }
-    handleContentChange();
-  };
+
+  // When the editor is mounted, attach event listeners to existing checkboxes
+  useEffect(() => {
+    attachCheckboxEventListeners();
+    
+    // Cleanup
+    return () => {
+      if (editorRef.current) {
+        const checkboxes = editorRef.current.querySelectorAll(`.${styles.checkbox}`);
+        checkboxes.forEach(checkbox => {
+          checkbox.removeEventListener('click', toggleTaskCheckbox);
+        });
+      }
+    };
+  }, []);
 
   return (
     <div className={styles.editor}>
